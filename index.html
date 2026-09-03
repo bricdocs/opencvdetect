@@ -112,6 +112,8 @@ function kamerayiBaslat() {
     .then(function(stream) {
         video.srcObject = stream;
         video.play();
+console.log("Gerçek kamera:", video.videoWidth, "x", video.videoHeight);
+        
         streamActive = true;
         resultText.innerText = "🔍 Kart aranıyor... Kameraya kart gösterin.";
         console.log("✓ Arka kamera akışı başladı.");
@@ -242,8 +244,11 @@ function canliTaramaDongusu() {
 
         } else {
 
-    resultText.innerText =
-        `Kart aranıyor... En iyi skor: %${Math.round(enIyiSkor * 100)} (${enIyiKart || "yok"})`;
+    // resultText.innerText =
+    //     `Kart aranıyor... En iyi skor: %${Math.round(enIyiSkor * 100)} (${enIyiKart || "yok"})`;
+
+resultText.innerText =
+    `Kart aranıyor... En iyi skor: %${Math.round(enIyiSkor * 100)} (${enIyiKart || "yok"}) | Kamera: ${video.videoWidth}x${video.videoHeight}`;
 
     resultText.style.color = "#fff";
 }
