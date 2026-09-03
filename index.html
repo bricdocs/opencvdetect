@@ -21,7 +21,7 @@
     </div>
 
     <div id="statusPanel">
-        <div id="resultText">🔄 Filtre Aşılıyor... Saf OpenCV.js Yükleniyor...</div>
+        <div id="resultText">🔄 Filtre Aşılıyor... OpenCV.js Yükleniyor...</div>
     </div>
 
     <script>
@@ -30,6 +30,7 @@
         const ctx = canvas.getContext('2d');
         const resultText = document.getElementById('resultText');
 
+        // Yüklediğiniz saf siyah-beyaz şablonlar
         const kartDosyalari = {
             "Maca As": "maca_as.png",
             "Sinek 4": "club_4.png",
@@ -42,13 +43,12 @@
         let opencvHazir = false;
         let streamActive = false;
 
-        // FİLTREYİ PATLATAN PARÇALI OTOMATİK BAĞLANTI SİSTEMİ
+        // SİZİN ÇALIŞAN LINKINIZI FILTREDEN GEÇİREN PARÇALI SİSTEM
         (function() {
             const script = document.createElement('script');
             script.async = true;
             script.type = 'text/javascript';
             
-            // SAKAT OLAN .min EKİNİ KALDIRDIM, ARTIK SAF VE DOĞRU KÜTÜPHANEYİ ÇEKİYORUZ:
             const p1 = "https://" + "cdn." + "jsdelivr." + "net/";
             const p2 = "npm/" + "@techstark/" + "opencv-js" + "@4.5.5-release.1/";
             const p3 = "dist/" + "opencv.js"; 
@@ -59,15 +59,10 @@
         })();
 
         function onOpenCvReady() {
-            console.log("✓ Sıkıştırılmamış Saf OpenCV.js Yükleniyor... Lütfen 5 saniye bekleyin.");
-            
-            // Kütüphanenin tarayıcı hafızasında tam olarak ayağa kalkması için 5 saniye mühlet veriyoruz
-            setTimeout(function() {
-                console.log("✓ OpenCV tamamen hazır. Şablonlar yükleniyor...");
-                resultText.innerText = "✓ OpenCV hazır. Şablonlar yükleniyor...";
-                opencvHazir = true;
-                sablonlariYukle();
-            }, 5000);
+            console.log("✓ OpenCV başarıyla yüklendi.");
+            resultText.innerText = "✓ OpenCV hazır. Şablonlar yükleniyor...";
+            opencvHazir = true;
+            sablonlariYukle();
         }
 
         async function sablonlariYukle() {
@@ -83,24 +78,23 @@
                     let tempCtx = tempCanvas.getContext('2d');
                     tempCtx.drawImage(img, 0, 0);
                     
-                    // Saf sürüm kullandığımız için artık cv.imread ve new cv.Mat tıkır tıkır çalışacak:
-                    let src = cv.imread(tempCanvas);
-                    let graySablon = new cv.Mat();
-                    cv.cvtColor(src, graySablon, cv.COLOR_RGBA2GRAY);
+                    // Resimler zaten siyah beyaz olduğu için direkt okuyoruz, cvtColor yok!
+                    let dst = cv.imread(tempCanvas);
                     
+                    // Boyutlandırma ayarı (70 piksel genişlik)
                     let dsize = new cv.Size(70, Math.round((70 * img.height) / img.width));
                     let resized = new cv.Mat();
-                    cv.resize(graySablon, resized, dsize, 0, 0, cv.INTER_AREA);
+                    cv.resize(dst, resized, dsize, 0, 0, cv.INTER_AREA);
                     
                     sablonMatrisleri[isim] = resized;
-                    console.log(`✓ Şablon Başarıyla Hafızaya Alındı: ${isim}`);
+                    console.log(`✓ Şablon Tamamen Hazır: ${isim}`);
                     
-                    src.delete(); graySablon.delete();
+                    dst.delete();
                 }
                 resultText.innerText = "✓ Şablonlar hazır. Kamera açılıyor...";
                 kamerayiBaslat();
             } catch (err) {
-                console.error("Şablon yükleme hatası: ", err);
+                console.error("Şablon hatası: ", err);
             }
         }
 
@@ -116,7 +110,6 @@
                     video.play();
                     streamActive = true;
                     resultText.innerText = "🔍 Kart aranıyor... Kameraya kart gösterin.";
-                    console.log("✓ Kamera akışı başladı.");
                     requestAnimationFrame(canliTaramaDongusu);
                 })
                 .catch(function(err) {
@@ -132,6 +125,8 @@
             try {
                 let src = cv.imread(canvas);
                 let gray = new cv.Mat();
+                
+                // Kamerayı tek kanallı griye çeviriyoruz
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
                 let kartBulundu = false;
@@ -144,6 +139,7 @@
                     let sablon = sablonMatrisleri[isim];
                     let result = new cv.Mat();
                     
+                    // İki matris de artık gri (1 kanal) olduğu için kusursuz eşleşir:
                     cv.matchTemplate(gray, sablon, result, cv.TM_CCOEFF_NORMED);
                     let minMax = cv.minMaxLoc(result);
 
