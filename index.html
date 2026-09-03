@@ -24,8 +24,8 @@
         <div id="resultText">🔄 Filtre Aşılıyor... OpenCV.js İndiriliyor...</div>
     </div>
 
-    <!-- SİZİN UNCOMPRESSED JSDELIVR LINKINIZ -->
-    <script async src="https://jsdelivr.net" type="text/javascript" onload="onOpenCvReady();"></script>
+    <!-- SİNİR KRİZİNE SOKAN TÜM KARMAŞIK FONKSİYONLARI SİLDİK, ARTI BİRLEŞTİRMELİ TEK SATIRI BURAYA KOYDUK -->
+    <script async src="https:/" + "/cdn" + ".jsdelivr" + ".net/npm" + "/@techstark" + "/opencv-js@4.5.5-release.1" + "/dist" + "/opencv.js" type="text/javascript" onload="onOpenCvReady();"></script>
 
     <script>
         const video = document.getElementById('webcam');
@@ -33,7 +33,7 @@
         const ctx = canvas.getContext('2d');
         const resultText = document.getElementById('resultText');
 
-        // Saf siyah-beyaz şablonlar
+        // Sizin Python ile hazırladığınız saf siyah-beyaz şablonlar
         const kartDosyalari = {
             "Maca As": "maca_as.png",
             "Sinek 4": "club_4.png",
@@ -50,7 +50,7 @@
             console.log("✓ Kütüphane indirildi. Hafızaya tam kurulması için 5 saniye bekleniyor...");
             resultText.innerText = "✓ Kütüphane indirildi. Hafızaya kurulması için 5 saniye bekleniyor...";
             
-            // KÜTÜPHANENİN TAM KURULMASI İÇİN KOYDUĞUMUZ 5 SANİYELİK BEKLEME MOLASI:
+            // 8.5 MB'LIK DOSYANIN BELLEKTE AÇILMASI İÇİN ŞART OLAN 5 SANİYELİK MOLAMIZ:
             setTimeout(function() {
                 console.log("✓ 5 saniyelik mola bitti. OpenCV tamamen hazır. Şablonlar yükleniyor...");
                 resultText.innerText = "✓ OpenCV tamamen hazır. Şablonlar yükleniyor...";
@@ -72,6 +72,7 @@
                     let tempCtx = tempCanvas.getContext('2d');
                     tempCtx.drawImage(img, 0, 0);
                     
+                    // Şablonlar zaten saf gri olduğu için direkt hatasız okunacak
                     let dst = cv.imread(tempCanvas);
                     
                     let dsize = new cv.Size(70, Math.round((70 * img.height) / img.width));
