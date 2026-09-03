@@ -18,6 +18,16 @@
     <div id="videoContainer">
         <video id="webcam" autoplay playsinline muted></video>
         <canvas id="canvasOutput"></canvas>
+
+<div style="margin-top:10px;">
+    <div>DEBUG - OpenCV'nin Karşılaştırdığı Bölge</div>
+    <canvas id="debugCropCanvas"
+            width="200"
+            height="475"
+            style="border:2px solid yellow; image-rendering: pixelated;">
+    </canvas>
+</div>
+        
     </div>
 
     <div id="statusPanel">
@@ -32,6 +42,9 @@
         const canvas = document.getElementById('canvasOutput');
         const ctx = canvas.getContext('2d');
         const resultText = document.getElementById('resultText');
+
+const debugCropCanvas = document.getElementById("debugCropCanvas");
+const debugCropCtx = debugCropCanvas.getContext("2d");
 
         const kartDosyalari = {
             "Maca As": "maca_as.png",
@@ -160,11 +173,6 @@ function canliTaramaDongusu() {
         let enIyiLoc = null;
         let enIyiBoyut = { w: 0, h: 0 };
 
-        // ==========================================
-        // DEBUG: TÜM ŞABLONLARIN SONUÇLARI
-        // ==========================================
-        let debugSkorlar = {};
-
         // 3. Bütün kart şablonlarını tara
         for (let isim in sablonMatrisleri) {
 
@@ -180,18 +188,6 @@ function canliTaramaDongusu() {
 
             let minMax = cv.minMaxLoc(result);
 
-            // DEBUG:
-            // Bu şablon görüntünün hangi noktasında
-            // en yüksek skoru aldı?
-            debugSkorlar[isim] = {
-                skor: minMax.maxVal,
-                x: minMax.maxLoc.x,
-                y: minMax.maxLoc.y,
-                w: sablon.cols,
-                h: sablon.rows
-            };
-
-            // En yüksek skoru bul
             if (minMax.maxVal > enIyiSkor) {
                 enIyiSkor = minMax.maxVal;
                 enIyiKart = isim;
@@ -207,46 +203,61 @@ function canliTaramaDongusu() {
         }
 
         // ==========================================
-        // DEBUG ÇIKTISI
+        // DEBUG:
+        // OpenCV'nin bulduğu 40x95 bölgeyi göster
         // ==========================================
 
-        console.log("========== KART DEBUG ==========");
+        if (enIyiLoc !== null) {
 
-        for (let isim in debugSkorlar) {
+            let cropW = enIyiBoyut.w;
+            let cropH = enIyiBoyut.h;
 
-            let d = debugSkorlar[isim];
+            // Sınır kontrolü
+            if (
+                enIyiLoc.x >= 0 &&
+                enIyiLoc.y >= 0 &&
+                enIyiLoc.x + cropW <= gray.cols &&
+                enIyiLoc.y + cropH <= gray.rows
+            ) {
 
-            console.log(
-                isim +
-                " -> %" +
-                Math.round(d.skor * 100) +
-                " | x:" +
-                d.x +
-                " y:" +
-                d.y +
-                " | " +
-                d.w +
-                "x" +
-                d.h
-            );
+                let cropRect = new cv.Rect(
+                    enIyiLoc.x,
+                    enIyiLoc.y,
+                    cropW,
+                    cropH
+                );
+
+                let crop = gray.roi(cropRect);
+
+                // Canvas'ı temizle
+                debugCropCtx.clearRect(
+                    0,
+                    0,
+                    debugCropCanvas.width,
+                    debugCropCanvas.height
+                );
+
+                // 40x95 görüntüyü 5 kat büyüt
+                let cropCanvas = document.createElement("canvas");
+
+                cropCanvas.width = cropW;
+                cropCanvas.height = cropH;
+
+                cv.imshow(cropCanvas, crop);
+
+                debugCropCtx.imageSmoothingEnabled = false;
+
+                debugCropCtx.drawImage(
+                    cropCanvas,
+                    0,
+                    0,
+                    cropW * 5,
+                    cropH * 5
+                );
+
+                crop.delete();
+            }
         }
-
-        console.log(
-            "EN İYİ: " +
-            (enIyiKart || "yok") +
-            " -> %" +
-            Math.round(enIyiSkor * 100) +
-            " | x:" +
-            (enIyiLoc ? enIyiLoc.x : "-") +
-            " y:" +
-            (enIyiLoc ? enIyiLoc.y : "-") +
-            " | boyut:" +
-            enIyiBoyut.w +
-            "x" +
-            enIyiBoyut.h
-        );
-
-        console.log("================================");
 
         // ==========================================
         // 4. Eşik kontrolü
