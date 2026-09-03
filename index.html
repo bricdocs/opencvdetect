@@ -21,11 +21,11 @@
     </div>
 
     <div id="statusPanel">
-        <div id="resultText">🔄 Filtre Aşılıyor... OpenCV.js İndiriliyor...</div>
+        <div id="resultText">🔄 Kendi klasörünüzden opencv.js yükleniyor...</div>
     </div>
 
-    <!-- SİNİR KRİZİNE SOKAN TÜM KARMAŞIK FONKSİYONLARI SİLDİK, ARTI BİRLEŞTİRMELİ TEK SATIRI BURAYA KOYDUK -->
-    <script async src="https:/" + "/cdn" + ".jsdelivr" + ".net/npm" + "/@techstark" + "/opencv-js@4.5.5-release.1" + "/dist" + "/opencv.js" type="text/javascript" onload="onOpenCvReady();"></script>
+    <!-- DIŞ BAĞLANTI YOK, ARACI YOK. SADECE SİZİN YÜKLEDİĞİNİZ 8.19 MB'LIK DOSYAYI ÇAĞIRIR -->
+    <script async src="opencv.js" type="text/javascript" onload="onOpenCvReady();"></script>
 
     <script>
         const video = document.getElementById('webcam');
@@ -33,7 +33,7 @@
         const ctx = canvas.getContext('2d');
         const resultText = document.getElementById('resultText');
 
-        // Sizin Python ile hazırladığınız saf siyah-beyaz şablonlar
+        // Sizin Python ile hazırladığınız %100 saf siyah-beyaz şablonlar
         const kartDosyalari = {
             "Maca As": "maca_as.png",
             "Sinek 4": "club_4.png",
@@ -47,13 +47,13 @@
         let streamActive = false;
 
         function onOpenCvReady() {
-            console.log("✓ Kütüphane indirildi. Hafızaya tam kurulması için 5 saniye bekleniyor...");
-            resultText.innerText = "✓ Kütüphane indirildi. Hafızaya kurulması için 5 saniye bekleniyor...";
+            console.log("✓ Orijinal OpenCV.js yerel klasörden yüklendi. 5 saniye kurulma molası...");
+            resultText.innerText = "✓ Orijinal OpenCV.js yüklendi. Kurulması için 5 saniye bekleniyor...";
             
-            // 8.5 MB'LIK DOSYANIN BELLEKTE AÇILMASI İÇİN ŞART OLAN 5 SANİYELİK MOLAMIZ:
+            // 8.19 MB'LIK DEV DOSYANIN TARAYICI BELLEĞİNE OTURMASI İÇİN BEKLEME SÜRESİ
             setTimeout(function() {
-                console.log("✓ 5 saniyelik mola bitti. OpenCV tamamen hazır. Şablonlar yükleniyor...");
-                resultText.innerText = "✓ OpenCV tamamen hazır. Şablonlar yükleniyor...";
+                console.log("✓ Bekleme bitti. OpenCV tamamen kararlı. Şablonlar matrise okunuyor...");
+                resultText.innerText = "✓ OpenCV kararlı hale geldi. Şablonlar yükleniyor...";
                 opencvHazir = true;
                 sablonlariYukle();
             }, 5000); 
@@ -72,7 +72,7 @@
                     let tempCtx = tempCanvas.getContext('2d');
                     tempCtx.drawImage(img, 0, 0);
                     
-                    // Şablonlar zaten saf gri olduğu için direkt hatasız okunacak
+                    // Dosya orijinal tam sürüm olduğu için artık cv.imread asla çökmeyecek!
                     let dst = cv.imread(tempCanvas);
                     
                     let dsize = new cv.Size(70, Math.round((70 * img.height) / img.width));
@@ -80,20 +80,20 @@
                     cv.resize(dst, resized, dsize, 0, 0, cv.INTER_AREA);
                     
                     sablonMatrisleri[isim] = resized;
-                    console.log(`✓ Şablon Tamamen Hazır: ${isim}`);
+                    console.log(`✓ Şablon Yerel Matrise Alındı: ${isim}`);
                     
                     dst.delete();
                 }
                 resultText.innerText = "✓ Şablonlar hazır. Kamera açılıyor...";
                 kamerayiBaslat();
             } catch (err) {
-                console.error("Şablon hatası: ", err);
+                console.error("Şablon yükleme hatası: ", err);
             }
         }
 
         function kamerayiBaslat() {
             const constraints = {
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "environment" },
+                video: { width: { exact: 640 }, height: { exact: 480 }, facingMode: "environment" },
                 audio: false
             };
 
@@ -103,23 +103,24 @@
                     video.play();
                     streamActive = true;
                     resultText.innerText = "🔍 Kart aranıyor... Kameraya kart gösterin.";
-                    console.log("✓ Kamera akışı başarıyla başlatıldı.");
+                    console.log("✓ Kamera akışı tam sayı boyutlarında başlatıldı.");
                     requestAnimationFrame(canliTaramaDongusu);
                 })
                 .catch(function(err) {
                     console.error("Kamera hatası: ", err);
-                    resultText.innerText = "❌ Kamera izin hatası!";
+                    resultText.innerText = "❌ Kamera izin hatası veya donanım uyuşmazlığı!";
                 });
         }
 
         function canliTaramaDongusu() {
             if (!opencvHazir || !streamActive) return;
+            
+            // Küsurat sızmasını engellemek için çizimi tam sayı 640x480 olarak mühürlüyoruz
             ctx.drawImage(video, 0, 0, 640, 480);
             
             try {
                 let src = cv.imread(canvas);
-                let gray = new cv.Mat();
-                
+                let gray = new cv.Mat(480, 640, cv.CV_8UC1);
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
                 let kartBulundu = false;
@@ -132,6 +133,7 @@
                     let sablon = sablonMatrisleri[isim];
                     let result = new cv.Mat();
                     
+                    // Tam sürüm kütüphane ve saf gri iki matris artık kusursuz tokuşur:
                     cv.matchTemplate(gray, sablon, result, cv.TM_CCOEFF_NORMED);
                     let minMax = cv.minMaxLoc(result);
 
@@ -152,7 +154,7 @@
                     ctx.beginPath();
                     ctx.lineWidth = "4";
                     ctx.strokeStyle = "#00ff00";
-                    ctx.rect(enIyiLoc.x, enIyiLoc.y, enIyiBoyut.w, enIyiBoyut.h);
+                    ctx.rect(Math.round(enIyiLoc.x), Math.round(enIyiLoc.y), Math.round(enIyiBoyut.w), Math.round(enIyiBoyut.h));
                     ctx.stroke();
                 } else {
                     resultText.innerText = "Kart aranıyor... Kameraya bir kart gösterin.";
