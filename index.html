@@ -24,8 +24,8 @@
         <div id="resultText">🔄 OpenCV.js Yükleniyor...</div>
     </div>
 
-    <!-- SİZİN HAFIZAYA ALDIĞIMIZ ÇALIŞAN LINKINIZ -->
-    <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.5.5-release.1/dist/opencv.js" type="text/javascript" onload="onOpenCvReady();"></script>
+    <!-- SİZİN UNCOMPRESSED DOĞRU JSDELIVR LINKINIZ -->
+    <script async src="https://cdn. jsdelivr.net/npm/@techstark/opencv-js@4.5.5-release.1/dist/opencv.js" type="text/javascript" onload="onOpenCvReady();"></script>
 
     <script>
         const video = document.getElementById('webcam');
@@ -66,18 +66,19 @@
                     tempCtx.drawImage(img, 0, 0);
                     
                     let src = cv.imread(tempCanvas);
-                    let imgData = tempCtx.getImageData(0, 0, img.width, img.height);
-                    let dst = cv.matFromImageData(imgData);
+                    let graySablon = new cv.Mat();
                     
-                    // Sıkıştırılmış sürüme uyumlu boyutlandırma
-                    let resized = cv.matFromImageData(tempCtx.getImageData(0, 0, img.width, img.height));
+                    // Şablonları yüklerken griye çevirerek kanal uyuşmazlığını kökten çözüyoruz:
+                    cv.cvtColor(src, graySablon, cv.COLOR_RGBA2GRAY);
+                    
                     let dsize = new cv.Size(70, Math.round((70 * img.height) / img.width));
-                    cv.resize(dst, resized, dsize, 0, 0, cv.INTER_AREA);
+                    let resized = new cv.Mat();
+                    cv.resize(graySablon, resized, dsize, 0, 0, cv.INTER_AREA);
                     
                     sablonMatrisleri[isim] = resized;
-                    console.log(`✓ Şablon Hazır: ${isim}`);
+                    console.log(`✓ Şablon Hazır ve Griye Çevrildi: ${isim}`);
                     
-                    src.delete(); dst.delete();
+                    src.delete(); graySablon.delete();
                 }
                 resultText.innerText = "✓ Şablonlar hazır. Kamera açılıyor...";
                 kamerayiBaslat();
@@ -87,7 +88,12 @@
         }
 
         function kamerayiBaslat() {
-            navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false })
+            const constraints = {
+                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "environment" },
+                audio: false
+            };
+
+            navigator.mediaDevices.getUserMedia(constraints)
                 .then(function(stream) {
                     video.srcObject = stream;
                     video.play();
@@ -107,9 +113,7 @@
             
             try {
                 let src = cv.imread(canvas);
-                
-                // HATA VEREN "new cv.Mat()" BURADAN TAMAMEN KALDIRILDI:
-                let gray = cv.matFromImageData(ctx.getImageData(0, 0, 640, 480));
+                let gray = new cv.Mat();
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
                 let kartBulundu = false;
@@ -120,9 +124,7 @@
 
                 for (let isim in sablonMatrisleri) {
                     let sablon = sablonMatrisleri[isim];
-                    
-                    // HATA VEREN DİĞER "new cv.Mat()" DE BURADAN KALDIRILDI:
-                    let result = cv.matFromImageData(ctx.getImageData(0, 0, 640, 480));
+                    let result = new cv.Mat();
                     
                     cv.matchTemplate(gray, sablon, result, cv.TM_CCOEFF_NORMED);
                     let minMax = cv.minMaxLoc(result);
