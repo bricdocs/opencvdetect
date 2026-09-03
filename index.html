@@ -192,7 +192,6 @@ function canliTaramaDongusu() {
                 enIyiSkor = minMax.maxVal;
                 enIyiKart = isim;
                 enIyiLoc = minMax.maxLoc;
-
                 enIyiBoyut = {
                     w: sablon.cols,
                     h: sablon.rows
@@ -202,67 +201,43 @@ function canliTaramaDongusu() {
             result.delete();
         }
 
-        // ==========================================
-        // DEBUG:
-        // OpenCV'nin bulduğu 40x95 bölgeyi göster
-        // ==========================================
-
+        // 4. DEBUG
+        // OpenCV'nin gerçekten seçtiği bölgeyi göster.
+        // Örneğin Pik 8 testinde:
+        // x=44, y=19, 40x95
         if (enIyiLoc !== null) {
 
-            let cropW = enIyiBoyut.w;
-            let cropH = enIyiBoyut.h;
-
-            // Sınır kontrolü
-            if (
-                enIyiLoc.x >= 0 &&
-                enIyiLoc.y >= 0 &&
-                enIyiLoc.x + cropW <= gray.cols &&
-                enIyiLoc.y + cropH <= gray.rows
-            ) {
-
-                let cropRect = new cv.Rect(
+            let crop = gray.roi(
+                new cv.Rect(
                     enIyiLoc.x,
                     enIyiLoc.y,
-                    cropW,
-                    cropH
-                );
+                    enIyiBoyut.w,
+                    enIyiBoyut.h
+                )
+            );
 
-                let crop = gray.roi(cropRect);
+            // 40x95 -> 200x475
+            debugCropCanvas.width = enIyiBoyut.w * 5;
+            debugCropCanvas.height = enIyiBoyut.h * 5;
 
-                // Canvas'ı temizle
-                debugCropCtx.clearRect(
-                    0,
-                    0,
-                    debugCropCanvas.width,
-                    debugCropCanvas.height
-                );
+            // Piksel görüntüsünü büyütürken yumuşatma yapma
+            debugCropCtx.imageSmoothingEnabled = false;
 
-                // 40x95 görüntüyü 5 kat büyüt
-                let cropCanvas = document.createElement("canvas");
+            // Önce canvas'ı temizle
+            debugCropCtx.clearRect(
+                0,
+                0,
+                debugCropCanvas.width,
+                debugCropCanvas.height
+            );
 
-                cropCanvas.width = cropW;
-                cropCanvas.height = cropH;
+            // OpenCV'nin seçtiği gerçek GRAY bölgeyi göster
+            cv.imshow(debugCropCanvas, crop);
 
-                cv.imshow(cropCanvas, crop);
-
-                debugCropCtx.imageSmoothingEnabled = false;
-
-                debugCropCtx.drawImage(
-                    cropCanvas,
-                    0,
-                    0,
-                    cropW * 5,
-                    cropH * 5
-                );
-
-                crop.delete();
-            }
+            crop.delete();
         }
 
-        // ==========================================
-        // 4. Eşik kontrolü
-        // ==========================================
-
+        // 5. Eşik kontrolü
         if (enIyiSkor >= 0.50) {
 
             kartBulundu = true;
@@ -272,7 +247,7 @@ function canliTaramaDongusu() {
 
             resultText.style.color = "#00ff00";
 
-            // 5. 640x480 olduğu için koordinat dönüşümü yok
+            // 6. 640x480 olduğu için koordinat dönüşümü yok
             ctx.beginPath();
             ctx.lineWidth = 4;
             ctx.strokeStyle = "#00ff00";
