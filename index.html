@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Briç Canlı Kart Tanıma Testi</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #222; color: #fff; text-align: center; margin: 0; padding: 10px; }
+        #videoContainer { position: relative; margin: 10px auto; width: 640px; height: 480px; max-width: 100%; }
+        video, canvas { position: absolute; top: 0; left: 0; width: 640px; height: 480px; max-width: 100%; border: 2px solid #555; }
+        #statusPanel { margin: 15px auto; padding: 10px; width: 620px; max-width: 100%; background: #333; font-size: 1.2rem; font-weight: bold; border-radius: 5px; }
+        #logPanel { color: #aaa; font-size: 0.9rem; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
+    
+    <div id="videoContainer">
+        <!-- Canlı Kamera Akışı -->
+        <video id="webcam" autoplay playsinline muted></video>
+        <!-- OpenCV Çizim Katmanı -->
+        <canvas id="canvasOutput"></canvas>
+    </div>
+
+    <div id="statusPanel">
+        <div id="resultText">🔄 Sistem Başlatılıyor... OpenCV.js Yükleniyor...</div>
+        <div id="logPanel">Lütfen tarayıcı konsolunu (F12) açık tutun.</div>
+    </div>
+
+    <!-- OpenCV.js Kütüphanesini İnternetten Çağırıyoruz (Yaklaşık 8.5 MB otomatik yüklenir) -->
+    
+<script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.5.5-release.1/dist/opencv.min.js" type="text/javascript" onload="onOpenCvReady();"></script>
+
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvasOutput');
+        const ctx = canvas.getContext('2d');
+        const resultText = document.getElementById('resultText');
+
+        // 5 Kartlık Şablon Havuzumuz (GitHub klasöründeki resim isimleriyle birebir aynı)
+        const kartDosyalari = {
+            "Maca As": "maca_as.png",
+            "Sinek 4": "club_4.png",
+            "Sinek 6": "club_6.png",
+            "Karo 10": "karo_ten.png",
+            "Kupa 5": "kupa_5.png"
+        };
+
+        let sablonMatrisleri = {};
+        let opencvHazir = false;
+        let streamActive = false;
+
+        // OpenCV.js yüklendiğinde tetiklenecek fonksiyon
+        function onOpenCvReady() {
+            console.log("✓ OpenCV.js tarayıcıya başarıyla yüklendi.");
+            resultText.innerText = "✓ OpenCV hazır. Şablonlar yükleniyor...";
+            opencvHazir = true;
+            sablonlariYukle();
+        }
+
+        // Resimleri GitHub'dan çekip OpenCV formatına çeviriyoruz
+        async function sablonlariYukle() {
+            try {
+                for (let isim in kartDosyalari) {
+                    const img = new Image();
+                    img.src = kartDosyalari[isim];
+                    await new Promise(resolve => img.onload = resolve);
+                    
+                    // Geçici bir canvas ile resmi OpenCV matrisine aktar
+                    let tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = img.width;
+                    tempCanvas.height = img.height;
+                    let tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.drawImage(img, 0, 0);
+                    
+                    let src = cv.imread(tempCanvas);
+                    let dst = new cv.Mat();
+                    // Siyah-beyaz yap
+                    cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+                    
+                    // 640px kameraya uyması için şablon genişliğini 70 piksele sabitliyoruz
+                    let dsize = new cv.Size(70, Math.round((70 * img.height) / img.width));
+                    let resized = new cv.Mat();
+                    cv.resize(dst, resized, dsize, 0, 0, cv.INTER_AREA);
+                    
+                    sablonMatrisleri[isim] = resized;
+                    console.log(`✓ Şablon Hazır: ${isim} (${resized.cols}x${resized.rows})`);
+                    
+                    src.delete(); dst.delete();
+                }
+                resultText.innerText = "✓ Şablonlar hazır. Kamera açılıyor...";
+                kamerayiBaslat();
+            } catch (err) {
+                console.error("Şablon yükleme hatası: ", err);
+                resultText.innerText = "❌ Dosya yükleme hatası! Konsolu inceleyin.";
+            }
+        }
+
+        // Hem PC hem Android destekli Arka Kamera başlatıcı
+        function kamerayiBaslat() {
+            const constraints = {
+                video: {
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    // Android'de ön kamerayı değil, arkadaki ana kamerayı zorunlu kılar
+                    facingMode: "environment" 
+                },
+                audio: false
+            };
+
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(function(stream) {
+                    video.srcObject = stream;
+                    video.play();
+                    streamActive = true;
+                    resultText.innerText = "🔍 Kart aranıyor... Kameraya kart gösterin.";
+                    console.log("✓ Kamera akışı başladı (640x480).");
+                    // Canlı döngüyü tetikle
+                    requestAnimationFrame(canliTaramaDongusu);
+                })
+                .catch(function(err) {
+                    console.error("Kamera açılamadı: ", err);
+                    resultText.innerText = "❌ Kamera izni verilmedi veya bulunamadı!";
+                });
+        }
+
+        function canliTaramaDongusu() {
+            if (!opencvHazir || !streamActive) return;
+
+            ctx.drawImage(video, 0, 0, 640, 480);
+            
+            try {
+                let src = cv.imread(canvas);
+                let gray = new cv.Mat();
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+                let kartBulundu = false;
+                let enIyiKart = "";
+                let enIyiSkor = 0;
+                let enIyiLoc = null;
+                let enIyiBoyut = { w: 0, h: 0 };
+
+                for (let isim in sablonMatrisleri) {
+                    let sablon = sablonMatrisleri[isim];
+                    let result = new cv.Mat();
+                    
+                    cv.matchTemplate(gray, sablon, result, cv.TM_CCOEFF_NORMED);
+                    let minMax = cv.minMaxLoc(result);
+                    let maxVal = minMax.maxVal;
+                    let maxLoc = minMax.maxLoc;
+
+                    if (maxVal >= 0.55 && maxVal > enIyiSkor) {
+                        enIyiSkor = maxVal;
+                        enIyiKart = isim;
+                        enIyiLoc = maxLoc;
+                        enIyiBoyut = { w: sablon.cols, h: sablon.rows };
+                        kartBulundu = true;
+                    }
+                    
+                    // HAFIZANIN ŞİŞMESİNİ ENGELLEYEN KRİTİK TEMİZLİK SATIRI:
+                    result.delete(); 
+                }
+
+                if (kartBulundu) {
+                    resultText.innerText = `KART ALGILANDI: ${enIyiKart} (Uyum: %${Math.round(enIyiSkor * 100)})`;
+                    resultText.style.color = "#00ff00";
+
+                    ctx.beginPath();
+                    ctx.lineWidth = "4";
+                    ctx.strokeStyle = "#00ff00";
+                    ctx.rect(enIyiLoc.x, enIyiLoc.y, enIyiBoyut.w, enIyiBoyut.h);
+                    ctx.stroke();
+
+                    ctx.fillStyle = "#00ff00";
+                    ctx.font = "bold 16px Arial";
+                    ctx.fillText(enIyiKart, enIyiLoc.x, enIyiLoc.y - 10);
+                } else {
+                    resultText.innerText = "Kart aranıyor... Kameraya bir kart gösterin.";
+                    resultText.style.color = "#fff";
+                }
+
+                // Ana matrislerin temizliği
+                src.delete();
+                gray.delete();
+
+            } catch (err) {
+                console.error("OpenCV döngü hatası: ", err);
+            }
+
+            requestAnimationFrame(canliTaramaDongusu);
+        }
+
+    </script>
+</body>
+</html>
