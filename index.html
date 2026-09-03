@@ -1,142 +1,19 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Briç Canlı Kart Tanıma Testi</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #222; color: #fff; text-align: center; margin: 0; padding: 10px; }
-        #videoContainer { position: relative; margin: 10px auto; width: 640px; height: 480px; max-width: 100%; }
-        video, canvas { position: absolute; top: 0; left: 0; width: 640px; height: 480px; max-width: 100%; border: 2px solid #555; }
-        #statusPanel { margin: 15px auto; padding: 10px; width: 620px; max-width: 100%; background: #333; font-size: 1.2rem; font-weight: bold; border-radius: 5px; }
-    </style>
-</head>
-<body>
-
-    <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
-    
-    <div id="videoContainer">
-        <video id="webcam" autoplay playsinline muted></video>
-        <canvas id="canvasOutput"></canvas>
-    </div>
-
-    <div id="statusPanel">
-        <div id="resultText">🔄 Yerel OpenCV.js Yükleniyor...</div>
-    </div>
-
-    <!-- Sizin Colab'den indirdiğiniz o sapasağlam 8.19 MB'lık yerel dosya -->
-    <script async src="opencv.js" type="text/javascript" onload="onOpenCvReady();"></script>
-
-    <script>
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('canvasOutput');
-        const ctx = canvas.getContext('2d');
-        const resultText = document.getElementById('resultText');
-
-        const kartDosyalari = {
-            "Maca As": "maca_as.png",
-            "Sinek 4": "club_4.png",
-            "Sinek 6": "club_6.png",
-            "Karo 10": "karo_ten.png",
-            "Kupa 5": "kupa_5.png"
-        };
-
-        let sablonMatrisleri = {};
-        let opencvHazir = false;
-        let streamActive = false;
-
-        function onOpenCvReady() {
-            console.log("✓ OpenCV yerelden yüklendi. Bellek kurulumu için 5 saniye bekleniyor...");
-            resultText.innerText = "✓ OpenCV yüklendi. Kurulması için 5 saniye bekleniyor...";
-            
-            setTimeout(function() {
-                console.log("✓ OpenCV kararlı. Şablonlar yükleniyor...");
-                resultText.innerText = "✓ OpenCV hazır. Şablonlar yükleniyor...";
-                opencvHazir = true;
-                sablonlariYukle();
-            }, 5000); 
-        }
-
-        async function sablonlariYukle() {
-            try {
-                for (let isim in kartDosyalari) {
-                    const img = new Image();
-                    img.src = kartDosyalari[isim];
-                    await new Promise(resolve => img.onload = resolve);
-                    
-                    let tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = img.width;
-                    tempCanvas.height = img.height;
-                    let tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.drawImage(img, 0, 0);
-                    
-let dst = cv.imread(tempCanvas);
-
-// PNG'yi önce GRAY'e çevir
-let grayTemplate = new cv.Mat();
-cv.cvtColor(dst, grayTemplate, cv.COLOR_RGBA2GRAY);
-
-// 40 piksele küçült
-let dsize = new cv.Size(
-    40,
-    Math.round((40 * img.height) / img.width)
-);
-
-let resized = new cv.Mat();
-cv.resize(grayTemplate, resized, dsize, 0, 0, cv.INTER_AREA);
-
-// Bellekte artık 1 kanallı şablon saklanıyor
-sablonMatrisleri[isim] = resized;
-
-dst.delete();
-grayTemplate.delete();
-
-                
-                }
-                resultText.innerText = "✓ Şablonlar hazır. Kamera açılıyor...";
-                kamerayiBaslat();
-            } catch (err) {
-                console.error("Şablon hatası: ", err);
-            }
-        }
-
-function kamerayiBaslat() {
-    navigator.mediaDevices.getUserMedia({
-        video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-        },
-        audio: false
-    })
-    .then(function(stream) {
-        video.srcObject = stream;
-        video.play();
-        streamActive = true;
-        resultText.innerText = "🔍 Kart aranıyor... Kameraya kart gösterin.";
-        console.log("✓ Arka kamera akışı başladı.");
-        requestAnimationFrame(canliTaramaDongusu);
-    })
-    .catch(function(err) {
-        console.error("Kamera hatası: ", err);
-        resultText.innerText = "❌ Kamera izin/erişim hatası!";
-    });
-}
-
 function canliTaramaDongusu() {
     if (!opencvHazir || !streamActive) return;
 
-    // Kamera görüntüsünü ekranda göstermeye devam ediyoruz
+    // Kamerayı her karede ekranda göstermeye devam et
     ctx.drawImage(video, 0, 0, 640, 480);
 
-    // Telefonu yormamak için OpenCV taramasını yaklaşık 8 FPS yap
+    // --------------------------------------------------
+    // Telefonu rahatlat:
+    // OpenCV taraması yaklaşık 8 FPS
+    // --------------------------------------------------
     const simdi = performance.now();
 
-    if (typeof canliTaramaDongusu.sonTarama === "undefined") {
-        canliTaramaDongusu.sonTarama = 0;
-    }
-
-    if (simdi - canliTaramaDongusu.sonTarama < 125) {
+    if (
+        typeof canliTaramaDongusu.sonTarama !== "undefined" &&
+        simdi - canliTaramaDongusu.sonTarama < 125
+    ) {
         requestAnimationFrame(canliTaramaDongusu);
         return;
     }
@@ -144,40 +21,36 @@ function canliTaramaDongusu() {
     canliTaramaDongusu.sonTarama = simdi;
 
     try {
+
         // --------------------------------------------------
-        // 1. Kameradan 640x480 görüntüyü al
+        // 1. Kameradan TAM 640x480 görüntü al
         // --------------------------------------------------
         let imgData = ctx.getImageData(0, 0, 640, 480);
+
         let src = cv.matFromImageData(imgData);
 
         // --------------------------------------------------
-        // 2. Önce gri görüntü oluştur
-        // --------------------------------------------------
-        let grayFull = new cv.Mat();
-        cv.cvtColor(src, grayFull, cv.COLOR_RGBA2GRAY);
-
-        // --------------------------------------------------
-        // 3. OpenCV işlem görüntüsünü 320x240 yap
+        // 2. GRAY görüntü
         // --------------------------------------------------
         let gray = new cv.Mat();
 
-        cv.resize(
-            grayFull,
+        cv.cvtColor(
+            src,
             gray,
-            new cv.Size(320, 240),
-            0,
-            0,
-            cv.INTER_AREA
+            cv.COLOR_RGBA2GRAY
         );
 
         let kartBulundu = false;
         let enIyiKart = "";
         let enIyiSkor = 0;
         let enIyiLoc = null;
-        let enIyiBoyut = { w: 0, h: 0 };
+        let enIyiBoyut = {
+            w: 0,
+            h: 0
+        };
 
         // --------------------------------------------------
-        // 4. Şablonları tara
+        // 3. Bütün kart şablonlarını tara
         // --------------------------------------------------
         for (let isim in sablonMatrisleri) {
 
@@ -194,10 +67,9 @@ function canliTaramaDongusu() {
 
             let minMax = cv.minMaxLoc(result);
 
-            if (
-                minMax.maxVal >= 0.50 &&
-                minMax.maxVal > enIyiSkor
-            ) {
+            // En yüksek skoru sakla
+            if (minMax.maxVal > enIyiSkor) {
+
                 enIyiSkor = minMax.maxVal;
                 enIyiKart = isim;
                 enIyiLoc = minMax.maxLoc;
@@ -206,17 +78,17 @@ function canliTaramaDongusu() {
                     w: sablon.cols,
                     h: sablon.rows
                 };
-
-                kartBulundu = true;
             }
 
             result.delete();
         }
 
         // --------------------------------------------------
-        // 5. Sonucu göster
+        // 4. Eşik kontrolü
         // --------------------------------------------------
-        if (kartBulundu) {
+        if (enIyiSkor >= 0.50) {
+
+            kartBulundu = true;
 
             resultText.innerText =
                 `KART ALGILANDI: ${enIyiKart} (%${Math.round(enIyiSkor * 100)})`;
@@ -224,39 +96,37 @@ function canliTaramaDongusu() {
             resultText.style.color = "#00ff00";
 
             // --------------------------------------------------
-            // 6. 320x240 OpenCV koordinatını
-            //    640x480 kamera koordinatına geri çevir
+            // 5. YEŞİL DİKDÖRTGEN
+            //
+            // Görüntü yine 640x480 olduğu için
+            // koordinat dönüşümü YOK.
             // --------------------------------------------------
-
-            const scaleX = 640 / 320;
-            const scaleY = 480 / 240;
-
-            const x = enIyiLoc.x * scaleX;
-            const y = enIyiLoc.y * scaleY;
-            const w = enIyiBoyut.w * scaleX;
-            const h = enIyiBoyut.h * scaleY;
 
             ctx.beginPath();
             ctx.lineWidth = 4;
             ctx.strokeStyle = "#00ff00";
 
-            ctx.rect(x, y, w, h);
+            ctx.rect(
+                enIyiLoc.x,
+                enIyiLoc.y,
+                enIyiBoyut.w,
+                enIyiBoyut.h
+            );
 
             ctx.stroke();
 
         } else {
 
             resultText.innerText =
-                "Kart aranıyor... Kameraya bir kart gösterin.";
+                `Kart aranıyor... En iyi skor: %${Math.round(enIyiSkor * 100)}`;
 
             resultText.style.color = "#fff";
         }
 
         // --------------------------------------------------
-        // 7. Belleği temizle
+        // 6. Bellek temizliği
         // --------------------------------------------------
         src.delete();
-        grayFull.delete();
         gray.delete();
 
     } catch (err) {
@@ -266,7 +136,3 @@ function canliTaramaDongusu() {
 
     requestAnimationFrame(canliTaramaDongusu);
 }
-
-    </script>
-</body>
-</html>
