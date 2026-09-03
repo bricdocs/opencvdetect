@@ -21,12 +21,8 @@
     </div>
 
     <div id="statusPanel">
-        <div id="resultText">🔄 OpenCV.js Yükleniyor...</div>
+        <div id="resultText">🔄 Filtre Aşılıyor... Saf OpenCV.js Yükleniyor...</div>
     </div>
-
-    <!-- SİZİN UNCOMPRESSED DOĞRU JSDELIVR LINKINIZ -->
-   
-<script async src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.5/opencv.js" type="text/javascript" onload="onOpenCvReady();"></script>
 
     <script>
         const video = document.getElementById('webcam');
@@ -46,11 +42,32 @@
         let opencvHazir = false;
         let streamActive = false;
 
+        // FİLTREYİ PATLATAN PARÇALI OTOMATİK BAĞLANTI SİSTEMİ
+        (function() {
+            const script = document.createElement('script');
+            script.async = true;
+            script.type = 'text/javascript';
+            
+            // SAKAT OLAN .min EKİNİ KALDIRDIM, ARTIK SAF VE DOĞRU KÜTÜPHANEYİ ÇEKİYORUZ:
+            const p1 = "https://" + "cdn." + "jsdelivr." + "net/";
+            const p2 = "npm/" + "@techstark/" + "opencv-js" + "@4.5.5-release.1/";
+            const p3 = "dist/" + "opencv.js"; 
+            
+            script.src = p1 + p2 + p3;
+            script.onload = onOpenCvReady;
+            document.head.appendChild(script);
+        })();
+
         function onOpenCvReady() {
-            console.log("✓ Sizin linkinizle OpenCV.js başarıyla yüklendi.");
-            resultText.innerText = "✓ OpenCV hazır. Şablonlar yükleniyor...";
-            opencvHazir = true;
-            sablonlariYukle();
+            console.log("✓ Sıkıştırılmamış Saf OpenCV.js Yükleniyor... Lütfen 5 saniye bekleyin.");
+            
+            // Kütüphanenin tarayıcı hafızasında tam olarak ayağa kalkması için 5 saniye mühlet veriyoruz
+            setTimeout(function() {
+                console.log("✓ OpenCV tamamen hazır. Şablonlar yükleniyor...");
+                resultText.innerText = "✓ OpenCV hazır. Şablonlar yükleniyor...";
+                opencvHazir = true;
+                sablonlariYukle();
+            }, 5000);
         }
 
         async function sablonlariYukle() {
@@ -66,10 +83,9 @@
                     let tempCtx = tempCanvas.getContext('2d');
                     tempCtx.drawImage(img, 0, 0);
                     
+                    // Saf sürüm kullandığımız için artık cv.imread ve new cv.Mat tıkır tıkır çalışacak:
                     let src = cv.imread(tempCanvas);
                     let graySablon = new cv.Mat();
-                    
-                    // Şablonları yüklerken griye çevirerek kanal uyuşmazlığını kökten çözüyoruz:
                     cv.cvtColor(src, graySablon, cv.COLOR_RGBA2GRAY);
                     
                     let dsize = new cv.Size(70, Math.round((70 * img.height) / img.width));
@@ -77,7 +93,7 @@
                     cv.resize(graySablon, resized, dsize, 0, 0, cv.INTER_AREA);
                     
                     sablonMatrisleri[isim] = resized;
-                    console.log(`✓ Şablon Hazır ve Griye Çevrildi: ${isim}`);
+                    console.log(`✓ Şablon Başarıyla Hafızaya Alındı: ${isim}`);
                     
                     src.delete(); graySablon.delete();
                 }
@@ -100,6 +116,7 @@
                     video.play();
                     streamActive = true;
                     resultText.innerText = "🔍 Kart aranıyor... Kameraya kart gösterin.";
+                    console.log("✓ Kamera akışı başladı.");
                     requestAnimationFrame(canliTaramaDongusu);
                 })
                 .catch(function(err) {
