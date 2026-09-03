@@ -21,8 +21,11 @@
     </div>
 
     <div id="statusPanel">
-        <div id="resultText">🔄 Filtre Aşılıyor... OpenCV.js Yükleniyor...</div>
+        <div id="resultText">🔄 Filtre Aşılıyor... OpenCV.js İndiriliyor...</div>
     </div>
+
+    <!-- SİZİN UNCOMPRESSED JSDELIVR LINKINIZ -->
+    <script async src="https://jsdelivr.net" type="text/javascript" onload="onOpenCvReady();"></script>
 
     <script>
         const video = document.getElementById('webcam');
@@ -30,7 +33,7 @@
         const ctx = canvas.getContext('2d');
         const resultText = document.getElementById('resultText');
 
-        // Yüklediğiniz saf siyah-beyaz şablonlar
+        // Saf siyah-beyaz şablonlar
         const kartDosyalari = {
             "Maca As": "maca_as.png",
             "Sinek 4": "club_4.png",
@@ -43,26 +46,17 @@
         let opencvHazir = false;
         let streamActive = false;
 
-        // SİZİN ÇALIŞAN LINKINIZI FILTREDEN GEÇİREN PARÇALI SİSTEM
-        (function() {
-            const script = document.createElement('script');
-            script.async = true;
-            script.type = 'text/javascript';
-            
-            const p1 = "https://" + "cdn." + "jsdelivr." + "net/";
-            const p2 = "npm/" + "@techstark/" + "opencv-js" + "@4.5.5-release.1/";
-            const p3 = "dist/" + "opencv.js"; 
-            
-            script.src = p1 + p2 + p3;
-            script.onload = onOpenCvReady;
-            document.head.appendChild(script);
-        })();
-
         function onOpenCvReady() {
-            console.log("✓ OpenCV başarıyla yüklendi.");
-            resultText.innerText = "✓ OpenCV hazır. Şablonlar yükleniyor...";
-            opencvHazir = true;
-            sablonlariYukle();
+            console.log("✓ Kütüphane indirildi. Hafızaya tam kurulması için 5 saniye bekleniyor...");
+            resultText.innerText = "✓ Kütüphane indirildi. Hafızaya kurulması için 5 saniye bekleniyor...";
+            
+            // KÜTÜPHANENİN TAM KURULMASI İÇİN KOYDUĞUMUZ 5 SANİYELİK BEKLEME MOLASI:
+            setTimeout(function() {
+                console.log("✓ 5 saniyelik mola bitti. OpenCV tamamen hazır. Şablonlar yükleniyor...");
+                resultText.innerText = "✓ OpenCV tamamen hazır. Şablonlar yükleniyor...";
+                opencvHazir = true;
+                sablonlariYukle();
+            }, 5000); 
         }
 
         async function sablonlariYukle() {
@@ -78,10 +72,8 @@
                     let tempCtx = tempCanvas.getContext('2d');
                     tempCtx.drawImage(img, 0, 0);
                     
-                    // Resimler zaten siyah beyaz olduğu için direkt okuyoruz, cvtColor yok!
                     let dst = cv.imread(tempCanvas);
                     
-                    // Boyutlandırma ayarı (70 piksel genişlik)
                     let dsize = new cv.Size(70, Math.round((70 * img.height) / img.width));
                     let resized = new cv.Mat();
                     cv.resize(dst, resized, dsize, 0, 0, cv.INTER_AREA);
@@ -110,6 +102,7 @@
                     video.play();
                     streamActive = true;
                     resultText.innerText = "🔍 Kart aranıyor... Kameraya kart gösterin.";
+                    console.log("✓ Kamera akışı başarıyla başlatıldı.");
                     requestAnimationFrame(canliTaramaDongusu);
                 })
                 .catch(function(err) {
@@ -126,7 +119,6 @@
                 let src = cv.imread(canvas);
                 let gray = new cv.Mat();
                 
-                // Kamerayı tek kanallı griye çeviriyoruz
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
                 let kartBulundu = false;
@@ -139,7 +131,6 @@
                     let sablon = sablonMatrisleri[isim];
                     let result = new cv.Mat();
                     
-                    // İki matris de artık gri (1 kanal) olduğu için kusursuz eşleşir:
                     cv.matchTemplate(gray, sablon, result, cv.TM_CCOEFF_NORMED);
                     let minMax = cv.minMaxLoc(result);
 
