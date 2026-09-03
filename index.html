@@ -21,10 +21,10 @@
     </div>
 
     <div id="statusPanel">
-        <div id="resultText">🔄 Kendi klasörünüzden opencv.js yükleniyor...</div>
+        <div id="resultText">🔄 Yerel OpenCV.js Yükleniyor...</div>
     </div>
 
-    <!-- DIŞ BAĞLANTI YOK, ARACI YOK. SADECE SİZİN YÜKLEDİĞİNİZ 8.19 MB'LIK DOSYAYI ÇAĞIRIR -->
+    <!-- Sizin Colab'den indirdiğiniz o sapasağlam 8.19 MB'lık yerel dosya -->
     <script async src="opencv.js" type="text/javascript" onload="onOpenCvReady();"></script>
 
     <script>
@@ -33,7 +33,6 @@
         const ctx = canvas.getContext('2d');
         const resultText = document.getElementById('resultText');
 
-        // Sizin Python ile hazırladığınız %100 saf siyah-beyaz şablonlar
         const kartDosyalari = {
             "Maca As": "maca_as.png",
             "Sinek 4": "club_4.png",
@@ -47,13 +46,12 @@
         let streamActive = false;
 
         function onOpenCvReady() {
-            console.log("✓ Orijinal OpenCV.js yerel klasörden yüklendi. 5 saniye kurulma molası...");
-            resultText.innerText = "✓ Orijinal OpenCV.js yüklendi. Kurulması için 5 saniye bekleniyor...";
+            console.log("✓ OpenCV yerelden yüklendi. Bellek kurulumu için 5 saniye bekleniyor...");
+            resultText.innerText = "✓ OpenCV yüklendi. Kurulması için 5 saniye bekleniyor...";
             
-            // 8.19 MB'LIK DEV DOSYANIN TARAYICI BELLEĞİNE OTURMASI İÇİN BEKLEME SÜRESİ
             setTimeout(function() {
-                console.log("✓ Bekleme bitti. OpenCV tamamen kararlı. Şablonlar matrise okunuyor...");
-                resultText.innerText = "✓ OpenCV kararlı hale geldi. Şablonlar yükleniyor...";
+                console.log("✓ OpenCV kararlı. Şablonlar yükleniyor...");
+                resultText.innerText = "✓ OpenCV hazır. Şablonlar yükleniyor...";
                 opencvHazir = true;
                 sablonlariYukle();
             }, 5000); 
@@ -72,54 +70,53 @@
                     let tempCtx = tempCanvas.getContext('2d');
                     tempCtx.drawImage(img, 0, 0);
                     
-                    // Dosya orijinal tam sürüm olduğu için artık cv.imread asla çökmeyecek!
                     let dst = cv.imread(tempCanvas);
                     
-                    let dsize = new cv.Size(70, Math.round((70 * img.height) / img.width));
+                    // Şablon boyutunu tarayıcı bükmelerine karşı 40 piksele düşürüp garantiliyoruz
+                    let dsize = new cv.Size(40, Math.round((40 * img.height) / img.width));
                     let resized = new cv.Mat();
                     cv.resize(dst, resized, dsize, 0, 0, cv.INTER_AREA);
                     
                     sablonMatrisleri[isim] = resized;
-                    console.log(`✓ Şablon Yerel Matrise Alındı: ${isim}`);
+                    console.log(`✓ Şablon Hazır: ${isim} (${dsize.width}x${dsize.height})`);
                     
                     dst.delete();
                 }
                 resultText.innerText = "✓ Şablonlar hazır. Kamera açılıyor...";
                 kamerayiBaslat();
             } catch (err) {
-                console.error("Şablon yükleme hatası: ", err);
+                console.error("Şablon hatası: ", err);
             }
         }
 
         function kamerayiBaslat() {
-            const constraints = {
-                video: { width: { exact: 640 }, height: { exact: 480 }, facingMode: "environment" },
-                audio: false
-            };
-
-            navigator.mediaDevices.getUserMedia(constraints)
+            // Modern tarayıcılar için esnek ama tam sayı garantili kamera ayarı
+            navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false })
                 .then(function(stream) {
                     video.srcObject = stream;
                     video.play();
                     streamActive = true;
                     resultText.innerText = "🔍 Kart aranıyor... Kameraya kart gösterin.";
-                    console.log("✓ Kamera akışı tam sayı boyutlarında başlatıldı.");
+                    console.log("✓ Kamera akışı başladı.");
                     requestAnimationFrame(canliTaramaDongusu);
                 })
                 .catch(function(err) {
                     console.error("Kamera hatası: ", err);
-                    resultText.innerText = "❌ Kamera izin hatası veya donanım uyuşmazlığı!";
+                    resultText.innerText = "❌ Kamera izin hatası!";
                 });
         }
 
         function canliTaramaDongusu() {
             if (!opencvHazir || !streamActive) return;
             
-            // Küsurat sızmasını engellemek için çizimi tam sayı 640x480 olarak mühürlüyoruz
+            // Çizimi tam sayı alanına mühürle
             ctx.drawImage(video, 0, 0, 640, 480);
             
             try {
-                let src = cv.imread(canvas);
+                // Kamera matrisini doğrudan canvas verisinden sıfır hata ile üretiyoruz
+                let imgData = ctx.getImageData(0, 0, 640, 480);
+                let src = cv.matFromImageData(imgData);
+                
                 let gray = new cv.Mat(480, 640, cv.CV_8UC1);
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
@@ -133,11 +130,11 @@
                     let sablon = sablonMatrisleri[isim];
                     let result = new cv.Mat();
                     
-                    // Tam sürüm kütüphane ve saf gri iki matris artık kusursuz tokuşur:
                     cv.matchTemplate(gray, sablon, result, cv.TM_CCOEFF_NORMED);
                     let minMax = cv.minMaxLoc(result);
 
-                    if (minMax.maxVal >= 0.55 && minMax.maxVal > enIyiSkor) {
+                    // Eşik değerini eski kameralar için %50'ye esnettik
+                    if (minMax.maxVal >= 0.50 && minMax.maxVal > enIyiSkor) {
                         enIyiSkor = minMax.maxVal;
                         enIyiKart = isim;
                         enIyiLoc = minMax.maxLoc;
@@ -154,7 +151,7 @@
                     ctx.beginPath();
                     ctx.lineWidth = "4";
                     ctx.strokeStyle = "#00ff00";
-                    ctx.rect(Math.round(enIyiLoc.x), Math.round(enIyiLoc.y), Math.round(enIyiBoyut.w), Math.round(enIyiBoyut.h));
+                    ctx.rect(enIyiLoc.x, enIyiLoc.y, enIyiBoyut.w, enIyiBoyut.h);
                     ctx.stroke();
                 } else {
                     resultText.innerText = "Kart aranıyor... Kameraya bir kart gösterin.";
