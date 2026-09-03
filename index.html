@@ -1,172 +1,763 @@
+<!DOCTYPE html>
+
+
+<html lang="tr">
+
+
+<head>
+
+
+    <meta charset="UTF-8">
+
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+    <title>Briç Canlı Kart Tanıma Testi</title>
+
+
+    <style>
+
+
+        body { font-family: Arial, sans-serif; background: #222; color: #fff; text-align: center; margin: 0; padding: 10px; }
+
+
+        #videoContainer { position: relative; margin: 10px auto; width: 640px; height: 480px; max-width: 100%; }
+
+
+        video, canvas { position: absolute; top: 0; left: 0; width: 640px; height: 480px; max-width: 100%; border: 2px solid #555; }
+
+
+        #statusPanel { margin: 15px auto; padding: 10px; width: 620px; max-width: 100%; background: #333; font-size: 1.2rem; font-weight: bold; border-radius: 5px; }
+
+
+    </style>
+
+
+</head>
+
+
+<body>
+
+
+
+
+
+    <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
+
+
+    
+
+
+    <div id="videoContainer">
+
+
+        <video id="webcam" autoplay playsinline muted></video>
+
+
+        <canvas id="canvasOutput"></canvas>
+
+
+    </div>
+
+
+
+
+
+    <div id="statusPanel">
+
+
+        <div id="resultText">🔄 Yerel OpenCV.js Yükleniyor...</div>
+
+
+    </div>
+
+
+
+
+
+    <!-- Sizin Colab'den indirdiğiniz o sapasağlam 8.19 MB'lık yerel dosya -->
+
+
+    <script async src="opencv.js" type="text/javascript" onload="onOpenCvReady();"></script>
+
+
+
+
+
+    <script>
+
+
+        const video = document.getElementById('webcam');
+
+
+        const canvas = document.getElementById('canvasOutput');
+
+
+        const ctx = canvas.getContext('2d');
+
+
+        const resultText = document.getElementById('resultText');
+
+
+
+
+
+        const kartDosyalari = {
+
+
+            "Maca As": "maca_as.png",
+
+
+            "Sinek 4": "club_4.png",
+
+
+            "Sinek 6": "club_6.png",
+
+
+            "Karo 10": "karo_ten.png",
+
+
+            "Kupa 5": "kupa_5.png"
+
+
+        };
+
+
+
+
+
+        let sablonMatrisleri = {};
+
+
+        let opencvHazir = false;
+
+
+        let streamActive = false;
+
+
+
+
+
+        function onOpenCvReady() {
+
+
+            console.log("✓ OpenCV yerelden yüklendi. Bellek kurulumu için 5 saniye bekleniyor...");
+
+
+            resultText.innerText = "✓ OpenCV yüklendi. Kurulması için 5 saniye bekleniyor...";
+
+
+            
+
+
+            setTimeout(function() {
+
+
+                console.log("✓ OpenCV kararlı. Şablonlar yükleniyor...");
+
+
+                resultText.innerText = "✓ OpenCV hazır. Şablonlar yükleniyor...";
+
+
+                opencvHazir = true;
+
+
+                sablonlariYukle();
+
+
+            }, 5000); 
+
+
+        }
+
+
+
+
+
+        async function sablonlariYukle() {
+
+
+            try {
+
+
+                for (let isim in kartDosyalari) {
+
+
+                    const img = new Image();
+
+
+                    img.src = kartDosyalari[isim];
+
+
+                    await new Promise(resolve => img.onload = resolve);
+
+
+                    
+
+
+                    let tempCanvas = document.createElement('canvas');
+
+
+                    tempCanvas.width = img.width;
+
+
+                    tempCanvas.height = img.height;
+
+
+                    let tempCtx = tempCanvas.getContext('2d');
+
+
+                    tempCtx.drawImage(img, 0, 0);
+
+
+                    
+
+
+let dst = cv.imread(tempCanvas);
+
+
+
+
+
+// PNG'yi önce GRAY'e çevir
+
+
+let grayTemplate = new cv.Mat();
+
+
+cv.cvtColor(dst, grayTemplate, cv.COLOR_RGBA2GRAY);
+
+
+
+
+
+// 40 piksele küçült
+
+
+let dsize = new cv.Size(
+
+
+    40,
+
+
+    Math.round((40 * img.height) / img.width)
+
+
+);
+
+
+
+
+
+let resized = new cv.Mat();
+
+
+cv.resize(grayTemplate, resized, dsize, 0, 0, cv.INTER_AREA);
+
+
+
+
+
+// Bellekte artık 1 kanallı şablon saklanıyor
+
+
+sablonMatrisleri[isim] = resized;
+
+
+
+
+
+dst.delete();
+
+
+grayTemplate.delete();
+
+
+
+
+
+                
+
+
+                }
+
+
+                resultText.innerText = "✓ Şablonlar hazır. Kamera açılıyor...";
+
+
+                kamerayiBaslat();
+
+
+            } catch (err) {
+
+
+                console.error("Şablon hatası: ", err);
+
+
+            }
+
+
+        }
+
+
+
+
+
+function kamerayiBaslat() {
+
+
+    navigator.mediaDevices.getUserMedia({
+
+
+        video: {
+
+
+            facingMode: { ideal: "environment" },
+
+
+            width: { ideal: 640 },
+
+
+            height: { ideal: 480 }
+
+
+        },
+
+
+        audio: false
+
+
+    })
+
+
+    .then(function(stream) {
+
+
+        video.srcObject = stream;
+
+
+        video.play();
+
+
+console.log("Gerçek kamera:", video.videoWidth, "x", video.videoHeight);
+
+
+        
+
+
+        streamActive = true;
+
+
+        resultText.innerText = "🔍 Kart aranıyor... Kameraya kart gösterin.";
+
+
+        console.log("✓ Arka kamera akışı başladı.");
+
+
+        requestAnimationFrame(canliTaramaDongusu);
+
+
+    })
+
+
+    .catch(function(err) {
+
+
+        console.error("Kamera hatası: ", err);
+
+
+        resultText.innerText = "❌ Kamera izin/erişim hatası!";
+
+
+    });
+
+
+}
+
+
+
+
+
+
+
 function canliTaramaDongusu() {
+
     if (!opencvHazir || !streamActive) return;
 
-    // Kamerayı ekranda göstermeye devam et
-    ctx.drawImage(video, 0, 0, 640, 480);
 
-    // OpenCV taraması yaklaşık 8 FPS
-    const simdi = performance.now();
 
-    if (
-        typeof canliTaramaDongusu.sonTarama !== "undefined" &&
-        simdi - canliTaramaDongusu.sonTarama < 125
-    ) {
-        requestAnimationFrame(canliTaramaDongusu);
-        return;
-    }
-
-    canliTaramaDongusu.sonTarama = simdi;
-
-    try {
+@@ -150,47 +22,45 @@ <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
 
         let src;
 
+
+
         // ==========================================
+
+
+        // 1. GERÇEK KAMERA GÖRÜNTÜSÜNÜ AL
+
+
         // 1. KAMERA GÖRÜNTÜSÜ
+
         // ==========================================
+
+
 
         if (video.videoWidth < video.videoHeight) {
 
+
+
             // TELEFON:
+
+
+            // Gerçek görüntü 480x640
+
+
+            // Önce gerçek boyutunda canvas'a al
+
+
             // Gerçek görüntü: 480 x 640
+
+
             // Ortadan 480 x 480 kırp
+
             let telefonCanvas = document.createElement("canvas");
 
+
+
+
             telefonCanvas.width = video.videoWidth;
+
+
+            telefonCanvas.height = video.videoHeight;
+
+
             telefonCanvas.height = video.videoWidth;
+
+
 
             let telefonCtx = telefonCanvas.getContext("2d");
 
+
+
+
             // Dikey görüntünün ortasındaki 480x480 alanı al
+
+
             const kirpY =
+
+
                 Math.round((video.videoHeight - video.videoWidth) / 2);
 
+
+
+
             telefonCtx.drawImage(
+
                 video,
+
                 0,
+
+
                 kirpY,
+
+
                 video.videoWidth,
+
+
                 video.videoWidth,
+
+
                 0,
+
                 0,
+
                 video.videoWidth,
+
+
+                video.videoHeight
+
+
                 video.videoWidth
+
             );
 
+
+
             let telefonImgData = telefonCtx.getImageData(
+
                 0,
+
                 0,
+
                 video.videoWidth,
+
+
+                video.videoHeight
+
+
                 video.videoWidth
+
             );
+
+
+
+
+            let telefonMat = cv.matFromImageData(telefonImgData);
+
+
+
+
+
+            // 90 derece saat yönünde döndür
+
+
+            src = new cv.Mat();
+
+
+
+
+
+            cv.rotate(
+
+
+                telefonMat,
+
+
+                src,
+
+
+                cv.ROTATE_90_CLOCKWISE
+
+
+            );
+
+
+
+
+
+            telefonMat.delete();
+
 
             src = cv.matFromImageData(telefonImgData);
 
+
+
         } else {
 
-            // PC:
-            // Mevcut 640x480 sistemi aynen koru
-            let imgData = ctx.getImageData(
-                0,
-                0,
-                640,
-                480
-            );
 
-            src = cv.matFromImageData(imgData);
-        }
+
+@@ -208,7 +78,7 @@ <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
+
+
+
 
 
         // ==========================================
+
+
+        // 2. GRAY GÖRÜNTÜ
+
+
         // 2. GRAY
+
         // ==========================================
+
+
 
         let gray = new cv.Mat();
 
-        cv.cvtColor(
-            src,
-            gray,
-            cv.COLOR_RGBA2GRAY
-        );
+@@ -224,7 +94,6 @@ <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
 
-
-        // ==========================================
         // 3. EN İYİ KARTI BUL
+
         // ==========================================
+
+
+
+
+        let kartBulundu = false;
 
         let enIyiKart = "";
+
         let enIyiSkor = 0;
+
         let enIyiLoc = null;
-        let enIyiBoyut = {
-            w: 0,
+
+@@ -233,7 +102,6 @@ <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
+
             h: 0
+
         };
+
+
+
+
+
 
         for (let isim in sablonMatrisleri) {
 
+
+
             let sablon = sablonMatrisleri[isim];
-            let result = new cv.Mat();
 
-            cv.matchTemplate(
-                gray,
-                sablon,
-                result,
-                cv.TM_CCOEFF_NORMED
-            );
-
-            let minMax = cv.minMaxLoc(result);
-
-            if (minMax.maxVal > enIyiSkor) {
-
-                enIyiSkor = minMax.maxVal;
-                enIyiKart = isim;
-                enIyiLoc = minMax.maxLoc;
-
-                enIyiBoyut = {
-                    w: sablon.cols,
-                    h: sablon.rows
-                };
-            }
-
-            result.delete();
-        }
+@@ -270,30 +138,15 @@ <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
 
 
-        // ==========================================
-        // 4. EŞİK
-        // ==========================================
 
         if (enIyiSkor >= 0.50) {
 
+
+
+
+            kartBulundu = true;
+
+
+
+
             resultText.innerText =
+
                 `KART ALGILANDI: ${enIyiKart} (%${Math.round(enIyiSkor * 100)})`;
+
+
 
             resultText.style.color = "#00ff00";
 
+
+
+
+
+
+
+            // ======================================
+
+
+            // 5. YEŞİL KUTU
+
+
+            // ======================================
+
+
+
+
+
+            ctx.beginPath();
+
+
+            ctx.lineWidth = 4;
+
+
+            ctx.strokeStyle = "#00ff00";
+
+
+
+
+
+            ctx.rect(
+
+
+                enIyiLoc.x,
+
+
+                enIyiLoc.y,
+
+
+                enIyiBoyut.w,
+
+
+                enIyiBoyut.h
+
+
+            );
+
+
+
+
+
+            ctx.stroke();
+
+
             // Şimdilik kutuyu çizme.
+
+
             // Çünkü telefon görüntüsü 480x480,
+
+
             // ekran görüntüsü 640x480.
+
+
             // Önce skorun davranışını test ediyoruz.
+
+
 
         } else {
 
-            resultText.innerText =
-                `Kart aranıyor... En iyi skor: %${Math.round(enIyiSkor * 100)} (${enIyiKart || "yok"}) | Kamera: ${video.videoWidth}x${video.videoHeight}`;
 
-            resultText.style.color = "#fff";
+
+@@ -304,10 +157,6 @@ <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
+
         }
 
 
+
+
+
+
+        // ==========================================
+
+
+        // 6. BELLEK TEMİZLE
+
+
+        // ==========================================
+
+
+
+
         src.delete();
+
         gray.delete();
 
-    } catch (err) {
 
-        console.error(
-            "Döngü hatası: ",
-            err
+
+@@ -319,13 +168,5 @@ <h2>🃏 Briç Kartı Tanıma Web Paneli</h2>
+
         );
+
     }
 
+
+
+
+
+
+
+    requestAnimationFrame(
+
+
+        canliTaramaDongusu
+
+
+    );
+
+
     requestAnimationFrame(canliTaramaDongusu);
+
 }
+
+
+
+
+
+      
+
+
+    </script>
+
+
+</body>
+
+
+</html>
