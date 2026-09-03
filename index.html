@@ -24,7 +24,7 @@
         <div id="resultText">🔄 OpenCV.js Yükleniyor...</div>
     </div>
 
-    <!-- SİZİN BULDUĞUNUZ ÇALIŞAN JSDELIVR LINKINI DOĞRUDAN EKLEDİK -->
+    <!-- SİZİN HAFIZAYA ALDIĞIMIZ ÇALIŞAN LINKINIZ -->
     <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.5.5-release.1/dist/opencv.min.js" type="text/javascript" onload="onOpenCvReady();"></script>
 
     <script>
@@ -65,13 +65,13 @@
                     let tempCtx = tempCanvas.getContext('2d');
                     tempCtx.drawImage(img, 0, 0);
                     
-                    // Sıkıştırılmış kütüphane fonksiyonu (I.Mat uyuşmazlığı çözümü)
                     let src = cv.imread(tempCanvas);
                     let imgData = tempCtx.getImageData(0, 0, img.width, img.height);
                     let dst = cv.matFromImageData(imgData);
                     
+                    // Sıkıştırılmış sürüme uyumlu boyutlandırma
+                    let resized = cv.matFromImageData(tempCtx.getImageData(0, 0, img.width, img.height));
                     let dsize = new cv.Size(70, Math.round((70 * img.height) / img.width));
-                    let resized = new cv.Mat(dsize.height, dsize.width, cv.CV_8UC1);
                     cv.resize(dst, resized, dsize, 0, 0, cv.INTER_AREA);
                     
                     sablonMatrisleri[isim] = resized;
@@ -87,12 +87,7 @@
         }
 
         function kamerayiBaslat() {
-            const constraints = {
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "environment" },
-                audio: false
-            };
-
-            navigator.mediaDevices.getUserMedia(constraints)
+            navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false })
                 .then(function(stream) {
                     video.srcObject = stream;
                     video.play();
@@ -112,7 +107,9 @@
             
             try {
                 let src = cv.imread(canvas);
-                let gray = new cv.Mat(480, 640, cv.CV_8UC1);
+                
+                // HATA VEREN "new cv.Mat()" BURADAN TAMAMEN KALDIRILDI:
+                let gray = cv.matFromImageData(ctx.getImageData(0, 0, 640, 480));
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
                 let kartBulundu = false;
@@ -123,7 +120,9 @@
 
                 for (let isim in sablonMatrisleri) {
                     let sablon = sablonMatrisleri[isim];
-                    let result = new cv.Mat();
+                    
+                    // HATA VEREN DİĞER "new cv.Mat()" DE BURADAN KALDIRILDI:
+                    let result = cv.matFromImageData(ctx.getImageData(0, 0, 640, 480));
                     
                     cv.matchTemplate(gray, sablon, result, cv.TM_CCOEFF_NORMED);
                     let minMax = cv.minMaxLoc(result);
