@@ -128,7 +128,7 @@ console.log("Gerçek kamera:", video.videoWidth, "x", video.videoHeight);
 function canliTaramaDongusu() {
     if (!opencvHazir || !streamActive) return;
 
-    // Kamerayı ekranda göstermeye devam et
+    // Kamerayı her karede ekranda göstermeye devam et
     ctx.drawImage(video, 0, 0, 640, 480);
 
     // OpenCV taraması yaklaşık 8 FPS
@@ -146,89 +146,21 @@ function canliTaramaDongusu() {
 
     try {
 
-        let src;
+        // 1. Kameradan TAM 640x480 görüntü al
+        let imgData = ctx.getImageData(0, 0, 640, 480);
+        let src = cv.matFromImageData(imgData);
 
-        // ==========================================
-        // 1. KAMERA GÖRÜNTÜSÜ
-        // ==========================================
-
-        if (video.videoWidth < video.videoHeight) {
-
-            // TELEFON:
-            // Gerçek görüntü: 480 x 640
-            // Ortadan 480 x 480 kırp
-            let telefonCanvas = document.createElement("canvas");
-
-            telefonCanvas.width = video.videoWidth;
-            telefonCanvas.height = video.videoWidth;
-
-            let telefonCtx = telefonCanvas.getContext("2d");
-
-            // Dikey görüntünün ortasındaki 480x480 alanı al
-            const kirpY =
-                Math.round((video.videoHeight - video.videoWidth) / 2);
-
-            telefonCtx.drawImage(
-                video,
-                0,
-                kirpY,
-                video.videoWidth,
-                video.videoWidth,
-                0,
-                0,
-                video.videoWidth,
-                video.videoWidth
-            );
-
-            let telefonImgData = telefonCtx.getImageData(
-                0,
-                0,
-                video.videoWidth,
-                video.videoWidth
-            );
-
-            src = cv.matFromImageData(telefonImgData);
-
-        } else {
-
-            // PC:
-            // Mevcut 640x480 sistemi aynen koru
-            let imgData = ctx.getImageData(
-                0,
-                0,
-                640,
-                480
-            );
-
-            src = cv.matFromImageData(imgData);
-        }
-
-
-        // ==========================================
-        // 2. GRAY
-        // ==========================================
-
+        // 2. GRAY görüntü
         let gray = new cv.Mat();
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-        cv.cvtColor(
-            src,
-            gray,
-            cv.COLOR_RGBA2GRAY
-        );
-
-
-        // ==========================================
-        // 3. EN İYİ KARTI BUL
-        // ==========================================
-
+        let kartBulundu = false;
         let enIyiKart = "";
         let enIyiSkor = 0;
         let enIyiLoc = null;
-        let enIyiBoyut = {
-            w: 0,
-            h: 0
-        };
+        let enIyiBoyut = { w: 0, h: 0 };
 
+        // 3. Bütün kart şablonlarını tara
         for (let isim in sablonMatrisleri) {
 
             let sablon = sablonMatrisleri[isim];
@@ -244,11 +176,9 @@ function canliTaramaDongusu() {
             let minMax = cv.minMaxLoc(result);
 
             if (minMax.maxVal > enIyiSkor) {
-
                 enIyiSkor = minMax.maxVal;
                 enIyiKart = isim;
                 enIyiLoc = minMax.maxLoc;
-
                 enIyiBoyut = {
                     w: sablon.cols,
                     h: sablon.rows
@@ -258,41 +188,43 @@ function canliTaramaDongusu() {
             result.delete();
         }
 
-
-        // ==========================================
-        // 4. EŞİK
-        // ==========================================
-
+        // 4. Eşik kontrolü
         if (enIyiSkor >= 0.50) {
+
+            kartBulundu = true;
 
             resultText.innerText =
                 `KART ALGILANDI: ${enIyiKart} (%${Math.round(enIyiSkor * 100)})`;
 
             resultText.style.color = "#00ff00";
 
-            // Şimdilik kutuyu çizme.
-            // Çünkü telefon görüntüsü 480x480,
-            // ekran görüntüsü 640x480.
-            // Önce skorun davranışını test ediyoruz.
+            // 5. 640x480 olduğu için koordinat dönüşümü yok
+            ctx.beginPath();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#00ff00";
+
+            ctx.rect(
+                enIyiLoc.x,
+                enIyiLoc.y,
+                enIyiBoyut.w,
+                enIyiBoyut.h
+            );
+
+            ctx.stroke();
 
         } else {
 
             resultText.innerText =
-                `Kart aranıyor... En iyi skor: %${Math.round(enIyiSkor * 100)} (${enIyiKart || "yok"}) | Kamera: ${video.videoWidth}x${video.videoHeight}`;
+                `Kart aranıyor... En iyi skor: %${Math.round(enIyiSkor * 100)} (${enIyiKart || "yok"})`;
 
             resultText.style.color = "#fff";
         }
-
 
         src.delete();
         gray.delete();
 
     } catch (err) {
-
-        console.error(
-            "Döngü hatası: ",
-            err
-        );
+        console.error("Döngü hatası: ", err);
     }
 
     requestAnimationFrame(canliTaramaDongusu);
