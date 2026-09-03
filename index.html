@@ -70,17 +70,28 @@
                     let tempCtx = tempCanvas.getContext('2d');
                     tempCtx.drawImage(img, 0, 0);
                     
-                    let dst = cv.imread(tempCanvas);
-                    
-                    // Şablon boyutunu tarayıcı bükmelerine karşı 40 piksele düşürüp garantiliyoruz
-                    let dsize = new cv.Size(40, Math.round((40 * img.height) / img.width));
-                    let resized = new cv.Mat();
-                    cv.resize(dst, resized, dsize, 0, 0, cv.INTER_AREA);
-                    
-                    sablonMatrisleri[isim] = resized;
-                    console.log(`✓ Şablon Hazır: ${isim} (${dsize.width}x${dsize.height})`);
-                    
-                    dst.delete();
+let dst = cv.imread(tempCanvas);
+
+// PNG'yi önce GRAY'e çevir
+let grayTemplate = new cv.Mat();
+cv.cvtColor(dst, grayTemplate, cv.COLOR_RGBA2GRAY);
+
+// 40 piksele küçült
+let dsize = new cv.Size(
+    40,
+    Math.round((40 * img.height) / img.width)
+);
+
+let resized = new cv.Mat();
+cv.resize(grayTemplate, resized, dsize, 0, 0, cv.INTER_AREA);
+
+// Bellekte artık 1 kanallı şablon saklanıyor
+sablonMatrisleri[isim] = resized;
+
+dst.delete();
+grayTemplate.delete();
+
+                
                 }
                 resultText.innerText = "✓ Şablonlar hazır. Kamera açılıyor...";
                 kamerayiBaslat();
